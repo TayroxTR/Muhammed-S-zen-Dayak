@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Sözen Dövüş - Stres Atma</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
+    body {
+      background: radial-gradient(circle at center, #111827 0%, #030712 100%);
+      color: #fff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+      touch-action: manipulation;
+      padding: 10px;
+    }
+
+    h1 {
+      margin-bottom: 12px;
+      font-size: 26px;
+      font-weight: 900;
+      color: #f87171;
+      text-transform: uppercase;
+      text-shadow: 0 0 15px rgba(239, 68, 68, 0.9);
+      letter-spacing: 3px;
+    }
+
+    /* Ana Düzen: Sol Tuşlar | Sahne | Sağ Tuşlar Yan Yana */
+    .game-layout {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 15px;
+      max-width: 100%;
+    }
+
+    /* Sol ve Sağ Tuş Grupları (Alt Alta 2'şerli) */
+    .side-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 10;
+    }
+
+    /* Sahne Boyutu Telefona Uygun Kompakt Hale Getirildi */
+    #game-container {
+      position: relative;
+      width: 650px;
+      height: 480px;
+      border: 2px solid rgba(255, 255, 255, 0.15);
+      border-radius: 20px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9), 0 0 40px rgba(239, 68, 68, 0.15);
+      background: radial-gradient(circle at 70% 30%, #1e293b 0%, #0f172a 80%);
+      overflow: hidden;
+      display: flex;
+    }
+
+    canvas { display: block; }
+
+    /* Can Barı */
+    .health-bar-wrapper {
+      position: absolute;
+      top: 15px;
+      right: 20px;
+      width: 250px;
+      height: 24px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      padding: 3px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+      backdrop-filter: blur(8px);
+      z-index: 10;
+    }
+
+    .health-fill {
+      height: 100%;
+      width: 100%;
+      border-radius: 8px;
+      background: linear-gradient(90deg, #22c55e, #4ade80);
+      box-shadow: 0 0 20px rgba(34, 197, 94, 0.8);
+      transition: width 0.15s ease, background 0.3s;
+    }
+
+    /* Alt Alta Olacak Tuş Tasarımı */
+    .btn-round {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      color: #f8fafc;
+      border: 2px solid rgba(255, 255, 255, 0.18);
+      padding: 14px 18px;
+      font-size: 15px;
+      font-weight: 800;
+      border-radius: 16px;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 130px;
+    }
+
+    .btn-round:active {
+      transform: scale(0.95);
+    }
+
+    .btn-samsung {
+      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+      border-color: rgba(56, 189, 248, 0.4);
+      box-shadow: 0 8px 22px rgba(2, 132, 199, 0.4);
+    }
+
+    /* Ölüm Ekranı Overlay */
+    #death-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(10, 15, 26, 0.88);
+      backdrop-filter: blur(10px);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+    }
+
+    #death-title {
+      font-size: 60px;
+      font-weight: 900;
+      color: #ef4444;
+      text-shadow: 0 0 35px rgba(239, 68, 68, 0.9);
+      letter-spacing: 6px;
+      margin-bottom: 10px;
+    }
+
+    #death-note {
+      font-size: 22px;
+      font-weight: 700;
+      color: #fca5a5;
+      margin-bottom: 25px;
+      letter-spacing: 2px;
+    }
+
+    .btn-reset {
+      background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+      color: #fff;
+      border: 2px solid rgba(248, 113, 113, 0.6);
+      padding: 14px 30px;
+      font-size: 18px;
+      font-weight: 800;
+      border-radius: 40px;
+      cursor: pointer;
+      box-shadow: 0 12px 30px rgba(220, 38, 38, 0.6);
+    }
+  </style>
+</head>
+<body>
+
+  <h1>SÖZEN DÖVÜŞ</h1>
+
+  <div class="game-layout">
+    <!-- Sol Tarafta Alt Alta 2 Tuş -->
+    <div class="side-controls">
+      <button class="btn-round" onclick="vurusBaslat('yumruk', 10)">👊 Yumruk</button>
+      <button class="btn-round" onclick="vurusBaslat('tokat', 15)">✋ Tokat</button>
+    </div>
+
+    <!-- Ortada Sahne -->
+    <div id="game-container">
+      <div class="health-bar-wrapper">
+        <div id="health-bar" class="health-fill"></div>
+      </div>
+
+      <!-- Ölüm Ekranı -->
+      <div id="death-overlay">
+        <div id="death-title">ÖLDÜN</div>
+        <div id="death-note">Kahpe sözen geberdi</div>
+        <button class="btn-reset" onclick="oyunuSifirla()">🔄 Yeniden Başlat</button>
+      </div>
+
+      <canvas id="gameCanvas" width="650" height="480"></canvas>
+    </div>
+
+    <!-- Sağ Tarafta Alt Alta 2 Tuş -->
+    <div class="side-controls">
+      <button class="btn-round" onclick="vurusBaslat('tekme', 20)">🦶 Tekme</button>
+      <button class="btn-round btn-samsung" onclick="vurusBaslat('samsung', 30)">📱 Samsung</button>
+    </div>
+  </div>
+
+  <script>
+    function resizeGame() {
+      const layout = document.querySelector('.game-layout');
+      const windowWidth = window.innerWidth;
+      
+      const totalWidth = 650 + 300; 
+      let scale = (windowWidth - 20) / totalWidth;
+      if (scale > 1) scale = 1;
+
+      layout.style.transform = `scale(${scale})`;
+      layout.style.transformOrigin = 'center center';
+    }
+
+    window.addEventListener('resize', resizeGame);
+    window.addEventListener('load', resizeGame);
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function yukleGorsel(isim) {
+      const img = new Image();
+      img.src = `fotolar/${isim}.png`;
+      img.onerror = () => { img.src = `sözen/${isim}.png`; };
+      return img;
+    }
+
+    const images = {
+      adam1: yukleGorsel('adam1'),
+      adam2: yukleGorsel('adam2'),
+      adam3: yukleGorsel('adam3'),
+      adam4: yukleGorsel('adam4')
+    };
+
+    const attackImages = {
+      tokat: yukleGorsel('tokat'),
+      yumruk: yukleGorsel('yumruk'),
+      ayak: yukleGorsel('ayak'),
+      samsung: yukleGorsel('samsung')
+    };
+
+    function yukleSes(isim) {
+      const audio = new Audio(`sesler/${isim}.mp3`);
+      audio.onerror = () => { audio.src = `${isim}.mp3`; };
+      return audio;
+    }
+
+    const customSounds = {
+      tokat: yukleSes('tokat'),
+      yumruk: yukleSes('yumruk'),
+      tekme: yukleSes('ayak'),
+      samsung: yukleSes('samsung')
+    };
+
+    const vurussSesleri = [];
+    for (let i = 1; i <= 18; i++) {
+      let audio = new Audio(`sesler/${i}.mp3`);
+      audio.onerror = () => { audio.src = `${i}.mp3`; };
+      vurussSesleri.push(audio);
+    }
+
+    let calanVurusAudio = null;
+    let calanKonusmaAudio = null;
+    let idleTimer = null;
+
+    function vurusSesiCal(tip) {
+      if (calanVurusAudio) {
+        calanVurusAudio.pause();
+        calanVurusAudio.currentTime = 0;
+      }
+
+      let audioObj = customSounds[tip];
+      if (tip === 'tekme' && (!audioObj || audioObj.error)) {
+        audioObj = yukleSes('tekme');
+      }
+
+      if (audioObj && audioObj.src) {
+        calanVurusAudio = new Audio(audioObj.src);
+        calanVurusAudio.play().catch(e => console.log("Vuruş ses hatası:", e));
+      }
+    }
+
+    function karaktereKonusmaSesiCal() {
+      if (vurussSesleri.length === 0 || adam.health <= 0) return;
+
+      if (calanKonusmaAudio) {
+        calanKonusmaAudio.pause();
+        calanKonusmaAudio.currentTime = 0;
+      }
+
+      const index = Math.floor(Math.random() * vurussSesleri.length);
+      calanKonusmaAudio = new Audio(vurussSesleri[index].src);
+      calanKonusmaAudio.play().catch(e => console.log("Konuşma ses hatası:", e));
+    }
+
+    function resetIdleTimer() {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        if (adam.health > 0) {
+          karaktereKonusmaSesiCal();
+          resetIdleTimer();
+        }
+      }, 3000);
+    }
+
+    const MAX_HEALTH = 250;
+    const adam = {
+      x: 450,
+      y: 400,
+      targetHeight: 350,
+      health: MAX_HEALTH,
+      offsetX: 0,
+      offsetY: 0
+    };
+
+    let particles = [];
+    let projectiles = [];
+    let hitAnimations = [];
+    let hitFlash = 0;
+    let screenShake = 0;
+
+    function getAdamImage() {
+      const oran = adam.health / MAX_HEALTH;
+      if (oran <= 0) return images.adam4;
+      if (oran <= 0.35) return images.adam3;
+      if (oran <= 0.70) return images.adam2;
+      return images.adam1;
+    }
+
+    function updateHealthBar() {
+      const bar = document.getElementById('health-bar');
+      const oran = Math.max(0, adam.health) / MAX_HEALTH;
+      bar.style.width = (oran * 100) + '%';
+
+      if (oran <= 0.25) {
+        bar.style.background = 'linear-gradient(90deg, #ef4444, #dc2626)';
+        bar.style.boxShadow = '0 0 20px rgba(239, 68, 68, 0.8)';
+      } else if (oran <= 0.50) {
+        bar.style.background = 'linear-gradient(90deg, #f59e0b, #d97706)';
+        bar.style.boxShadow = '0 0 20px rgba(245, 158, 11, 0.8)';
+      } else {
+        bar.style.background = 'linear-gradient(90deg, #22c55e, #16a34a)';
+        bar.style.boxShadow = '0 0 20px rgba(34, 197, 94, 0.8)';
+      }
+    }
+
+    function createHitParticles(x, y) {
+      for (let i = 0; i < 28; i++) {
+        particles.push({
+          x: x,
+          y: y,
+          vx: (Math.random() - 0.5) * 20,
+          vy: (Math.random() - 0.5) * 20,
+          size: Math.random() * 7 + 2,
+          color: Math.random() > 0.4 ? '#ef4444' : '#f59e0b',
+          alpha: 1
+        });
+      }
+    }
+
+    function vurusBaslat(tip, hasar) {
+      if (adam.health <= 0) return;
+
+      resetIdleTimer();
+      vurusSesiCal(tip);
+
+      setTimeout(() => {
+        karaktereKonusmaSesiCal();
+      }, 50);
+
+      const headX = adam.x;
+      const headY = adam.y - 260;
+
+      if (tip === 'tokat') {
+        hitAnimations.push({
+          img: attackImages.tokat,
+          fallbackText: '✋',
+          startX: canvas.width + 100,
+          startY: headY - 20,
+          currentX: canvas.width + 100,
+          currentY: headY - 20,
+          targetX: headX,
+          targetY: headY,
+          size: 160,
+          rotation: -0.2,
+          alpha: 1,
+          speed: 0.18,
+          hitTriggered: false,
+          damage: hasar,
+          tip: tip
+        });
+      } else if (tip === 'yumruk') {
+        hitAnimations.push({
+          img: attackImages.yumruk,
+          fallbackText: '👊',
+          startX: -100,
+          startY: headY,
+          currentX: -100,
+          currentY: headY,
+          targetX: headX,
+          targetY: headY,
+          size: 150,
+          rotation: 0.2,
+          alpha: 1,
+          speed: 0.18,
+          hitTriggered: false,
+          damage: hasar,
+          tip: tip
+        });
+      } else if (tip === 'tekme') {
+        hitAnimations.push({
+          img: attackImages.ayak,
+          fallbackText: '🦶',
+          startX: canvas.width + 100,
+          startY: headY + 80,
+          currentX: canvas.width + 100,
+          currentY: headY + 80,
+          targetX: headX,
+          targetY: headY,
+          size: 170,
+          rotation: -0.5,
+          alpha: 1,
+          speed: 0.16,
+          hitTriggered: false,
+          damage: hasar,
+          tip: tip
+        });
+      } else if (tip === 'samsung') {
+        projectiles.push({
+          img: attackImages.samsung,
+          x: 80,
+          y: headY,
+          targetX: headX,
+          targetY: headY,
+          speed: 24,
+          rotation: 0,
+          damage: hasar,
+          tip: tip
+        });
+      }
+    }
+
+    function triggerImpact(x, y, hasar) {
+      if (adam.health <= 0) return;
+
+      adam.health -= hasar;
+      if (adam.health < 0) adam.health = 0;
+      updateHealthBar();
+
+      hitFlash = 0.45;
+      screenShake = 15;
+      adam.offsetX = (Math.random() - 0.5) * 60;
+      adam.offsetY = (Math.random() - 0.5) * 35;
+      createHitParticles(x, y);
+
+      if (adam.health <= 0) {
+        if (idleTimer) clearTimeout(idleTimer);
+        setTimeout(() => {
+          document.getElementById('death-overlay').style.display = 'flex';
+        }, 400);
+      }
+
+      setTimeout(() => {
+        adam.offsetX = 0;
+        adam.offsetY = 0;
+      }, 200);
+    }
+
+    function oyunuSifirla() {
+      adam.health = MAX_HEALTH;
+      updateHealthBar();
+      document.getElementById('death-overlay').style.display = 'none';
+      resetIdleTimer();
+    }
+
+    resetIdleTimer();
+
+    function loop() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.save();
+      
+      if (screenShake > 0) {
+        const shakeX = (Math.random() - 0.5) * screenShake;
+        const shakeY = (Math.random() - 0.5) * screenShake;
+        ctx.translate(shakeX, shakeY);
+        screenShake -= 1;
+      }
+
+      // Zemin
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 400, canvas.width, 80);
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+      ctx.beginPath();
+      ctx.ellipse(adam.x, 410, 190, 30, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Karakter Gölgesi
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.beginPath();
+      ctx.ellipse(adam.x + adam.offsetX, 410, 100, 18, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      const currentImg = getAdamImage();
+      const drawX = adam.x + adam.offsetX;
+      const drawY = adam.y + adam.offsetY;
+
+      if (currentImg && currentImg.complete && currentImg.naturalWidth !== 0) {
+        const aspectRatio = currentImg.naturalWidth / currentImg.naturalHeight;
+        const renderHeight = adam.targetHeight;
+        const renderWidth = renderHeight * aspectRatio;
+
+        ctx.drawImage(
+          currentImg, 
+          drawX - renderWidth / 2, 
+          drawY - renderHeight, 
+          renderWidth, 
+          renderHeight
+        );
+      } else {
+        ctx.fillStyle = adam.health <= 0 ? '#1f2937' : '#6b7280';
+        ctx.fillRect(drawX - 80, drawY - 300, 160, 300);
+      }
+
+      if (hitFlash > 0) {
+        ctx.fillStyle = `rgba(239, 68, 68, ${hitFlash})`;
+        ctx.fillRect(-20, -20, canvas.width + 40, canvas.height + 40);
+        hitFlash -= 0.04;
+      }
+
+      for (let i = hitAnimations.length - 1; i >= 0; i--) {
+        let anim = hitAnimations[i];
+        
+        anim.currentX += (anim.targetX - anim.currentX) * anim.speed;
+        anim.currentY += (anim.targetY - anim.currentY) * anim.speed;
+
+        if (!anim.hitTriggered && Math.abs(anim.currentX - anim.targetX) < 25) {
+          anim.hitTriggered = true;
+          triggerImpact(anim.targetX, anim.targetY, anim.damage);
+        }
+
+        if (anim.hitTriggered) {
+          anim.alpha -= 0.08;
+        }
+
+        ctx.save();
+        ctx.translate(anim.currentX, anim.currentY);
+        ctx.rotate(anim.rotation);
+        ctx.globalAlpha = Math.max(0, anim.alpha);
+
+        if (anim.img && anim.img.complete && anim.img.naturalWidth !== 0) {
+          ctx.drawImage(anim.img, -anim.size / 2, -anim.size / 2, anim.size, anim.size);
+        } else {
+          ctx.font = `${anim.size * 0.8}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(anim.fallbackText, 0, 0);
+        }
+
+        ctx.restore();
+
+        if (anim.alpha <= 0) {
+          hitAnimations.splice(i, 1);
+        }
+      }
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.alpha -= 0.04;
+
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = Math.max(0, p.alpha);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        if (p.alpha <= 0) particles.splice(i, 1);
+      }
+
+      for (let i = projectiles.length - 1; i >= 0; i--) {
+        let p = projectiles[i];
+        p.x += p.speed;
+        p.rotation += 0.25;
+
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rotation);
+        
+        if (p.img && p.img.complete && p.img.naturalWidth !== 0) {
+          ctx.drawImage(p.img, -36, -36, 72, 72);
+        } else {
+          ctx.fillStyle = '#111';
+          ctx.fillRect(-14, -28, 28, 56);
+          ctx.fillStyle = '#38bdf8';
+          ctx.fillRect(-11, -23, 22, 46);
+        }
+        
+        ctx.restore();
+
+        if (p.x >= p.targetX) {
+          triggerImpact(p.targetX, p.targetY, p.damage);
+          projectiles.splice(i, 1);
+        }
+      }
+
+      ctx.restore();
+
+      requestAnimationFrame(loop);
+    }
+
+    loop();
+  </script>
+</body>
+</html>
